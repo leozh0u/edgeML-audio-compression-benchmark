@@ -1,0 +1,6 @@
+esc50env/
+wandb/
+checkpoints/
+ESC-50/
+__pycache__/
+*.pyc
