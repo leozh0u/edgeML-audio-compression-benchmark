@@ -118,6 +118,10 @@ def normalize(rows):
             out.append({"label": f"{r['name']}-qat", "name": r["name"], "stage": "qat",
                         "acc": r["int8_acc"], "size_kb": r["int8_kb"],
                         "latency_ms": r.get("int8_latency_ms")})
+        elif stage == "tflite_int8":
+            out.append({"label": f"{r['name']}-tflite", "name": r["name"], "stage": "tflite_int8",
+                        "acc": r["int8_acc"], "size_kb": r["int8_kb"],
+                        "latency_ms": None})
         elif stage == "prune":
             out.append({"label": f"{r['name']}-prune{int(r['target_sparsity']*100)}",
                         "name": r["name"], "stage": "prune",
@@ -131,7 +135,8 @@ def plot(rows, path):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    colors = {"fp32": "#1f77b4", "ptq": "#ff7f0e", "qat": "#2ca02c", "prune": "#d62728"}
+    colors = {"fp32": "#1f77b4", "ptq": "#ff7f0e", "qat": "#2ca02c", "prune": "#d62728",
+              "tflite_int8": "#9467bd"}
     fig, ax = plt.subplots(figsize=(9, 6))
     for stage, c in colors.items():
         pts = [r for r in rows if r["stage"] == stage]
@@ -167,6 +172,7 @@ def main():
     rows += load_json(C.RESULTS_DIR / "ptq_results.json")
     rows += load_json(C.RESULTS_DIR / "qat_results.json")
     rows += load_json(C.RESULTS_DIR / "prune_results.json")
+    rows += load_json(C.RESULTS_DIR / "tflite_results.json")
 
     unified = normalize(rows)
     with open(C.RESULTS_DIR / "benchmark.json", "w") as f:

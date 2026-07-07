@@ -57,16 +57,14 @@ void setup() {
     return;
   }
 
-  // Only the ops this CNN uses, to keep the binary small.
-  static tflite::MicroMutableOpResolver<8> resolver;
+  // Exactly the ops in mid_student_int8_clean.tflite (verified with the tflite
+  // interpreter). ReLU is fused into CONV_2D; input is already int8 so there is
+  // no standalone QUANTIZE op; GlobalAveragePool lowers to MEAN.
+  static tflite::MicroMutableOpResolver<4> resolver;
   resolver.AddConv2D();
-  resolver.AddDepthwiseConv2D();
   resolver.AddMaxPool2D();
-  resolver.AddMean();              // AdaptiveAvgPool -> mean
+  resolver.AddMean();              // GlobalAveragePool2D -> MEAN
   resolver.AddFullyConnected();
-  resolver.AddRelu();
-  resolver.AddReshape();
-  resolver.AddQuantize();
 
   static tflite::MicroInterpreter static_interpreter(
       model, resolver, tensor_arena, sizeof(tensor_arena));

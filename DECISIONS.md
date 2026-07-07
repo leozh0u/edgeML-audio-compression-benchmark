@@ -90,5 +90,21 @@
 - scripts/export_esp32.py converts a .tflite into a C byte array (model_data.cc/.h). Validated against the existing mid_student tflite.
 - Two honest gaps that need the board / a clean int8 tflite:
   1. mel_frontend.cc — FFT/mel kernels are stubbed (control flow + normalization done); must be A/B-validated against wav_to_mel on-device or accuracy silently dies.
-  2. A trustworthy fully-INT8 .tflite for the QAT students still isn't produced (the TF SavedModel hang from milestone 4 is unresolved). Existing mid_student tflites are from the flaky TF path and their sizes look wrong (labeled "int8" but 251 KB). Regenerate in a clean env or Colab before trusting on-device numbers.
+  2. A trustworthy fully-INT8 .tflite for the QAT students still isn't produced (the TF SavedModel hang from milestone 4 is unresolved). Existing mid_student tflites are from the flaky TF path and their sizes look wrong (labeled "int8" but 251 KB). Regenerate in a clean env or Colab before trusting on-device numbers. [RESOLVED below.]
+
+## Milestone 4 RESOLVED: clean INT8 TFLite via native Keras rebuild
+- Root cause of the original 5-hour hang was always the same: every route (onnx2tf -osd, tf.lite from_saved_model, onnx2tf internals) went through TensorFlow's *SavedModel-restore-from-disk* step, which froze indefinitely on this machine (0% CPU, unkillable).
+- Fix (two-phase, avoids ONNX and SavedModel entirely):
+  1. dump_weights.py (esc50env/torch): export each student's conv/BN/linear weights + K reference FP32 logits to a plain .npz. Keeps torch out of the TF env.
+  2. convert_tflite_clean.py (tflite_env, TF 2.21 / py3.11): rebuild the student natively in Keras, port the weights (NCHW->NHWC: conv transpose (2,3,1,0), linear .T, BN eps forced to torch's 1e-5), then tf.lite.TFLiteConverter.from_keras_model with a representative dataset for full INT8. from_keras_model traces an in-memory concrete function — no SavedModel bundle is ever written or restored, so the hang is structurally impossible.
+- Recreated tflite_env at ../tflite_env (py3.11, tensorflow 2.21). TF imports and converts in seconds; no hang. The "environment-specific TF SavedModel bug" was never in TF-the-library, it was that one on-disk-restore code path.
+- Two guardrails make the output trustworthy (not just produced):
+  1. FP32 parity BEFORE quantizing: Keras logits vs torch reference logits -> max|Δ| ~8e-6, 100% argmax agreement. Proves the port is faithful.
+  2. INT8 validation on full fold-5 via tf.lite.Interpreter.
+- Results (verified, full-INT8, int8 in/out — the actual deployable format):
+  - mid_student_int8_clean.tflite : 70.0% acc, 74.5 KB.
+  - tiny_student_int8_clean.tflite: 54.0% acc, 26.7 KB.
+- Note: tiny at 54.0% (tflite) vs 56.5% (QAT) — consistent with the whole project's finding that tiny is the model that resists compression. QAT stays the best tiny *checkpoint*; the tflite is what deploys.
+- On-device op set verified with the interpreter: CONV_2D, MAX_POOL_2D, MEAN, FULLY_CONNECTED (ReLU fused into conv; int8 input so no QUANTIZE op). ESP32 firmware resolver trimmed to exactly these 4. model_data.cc regenerated from the clean 74.5 KB mid tflite.
+- Old flaky-path tflites under tflite_models/mid_student_out/ and mid_student_savedmodel/ are left in place but superseded; use *_int8_clean.tflite.
 

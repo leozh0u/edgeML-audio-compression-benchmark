@@ -1,0 +1,20 @@
+[
+  {
+    "name": "mid_student",
+    "stage": "tflite_int8",
+    "int8_acc": 0.7,
+    "int8_kb": 74.5,
+    "parity_max_abs": 8.58306884765625e-06,
+    "parity_agreement": 1.0,
+    "path": "tflite_models/mid_student_int8_clean.tflite"
+  },
+  {
+    "name": "tiny_student",
+    "stage": "tflite_int8",
+    "int8_acc": 0.54,
+    "int8_kb": 26.7,
+    "parity_max_abs": 6.67572021484375e-06,
+    "parity_agreement": 1.0,
+    "path": "tflite_models/tiny_student_int8_clean.tflite"
+  }
+]
