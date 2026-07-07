@@ -9,4 +9,5 @@ tflite_models/
 .DS_Store
 esp32/.pio/
 esp32/src/esc50_model/model_data.cc
+esp32/host_test/build/
 # results/ is kept in git: benchmark.json + pareto.png are the deliverable.

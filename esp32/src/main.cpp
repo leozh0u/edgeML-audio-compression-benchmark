@@ -4,14 +4,18 @@
 //            FFT + mel filterbank) -> TFLite Micro INT8 inference -> top-1 class
 //            -> push {label, confidence, latency} to the dashboard over WebSocket.
 //
-// STATUS: structurally complete and flash-ready, but two pieces need the board +
-// a trustworthy INT8 .tflite to finish and tune (both flagged inline as TODO):
-//   1. mel_frontend.cc  — the FFT/mel math (parameters are fixed in config.h).
-//   2. the int8 quant params (input scale/zero-point) come from the .tflite;
-//      read them from input->params at runtime (done below) so no hardcoding.
+// STATUS: structurally complete and flash-ready. mel_frontend.cc now does the
+// real FFT/mel math (off-board validated against librosa, see
+// scripts/validate_mel_frontend.py) instead of the old zero-fill stub, and
+// the milestone-4 TFLite export hang is resolved (see DECISIONS.md §0),
+// so a trustworthy int8 .tflite exists to embed via export_esp32.py.
+// int8 quant params (input scale/zero-point) are read from the .tflite at
+// runtime via input->params (below), never hardcoded.
 //
 // Nothing here needs the network or mic to *compile*; those are guarded so you
 // can flash and confirm the model loads + runs on a static test input first.
+// Wiring a real I2S mic buffer into mel_frontend_compute() and measuring
+// on-device latency/RAM are the actual remaining board-only steps.
 
 #include <Arduino.h>
 #include "config.h"

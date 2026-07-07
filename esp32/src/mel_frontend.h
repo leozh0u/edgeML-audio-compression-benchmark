@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 #include "config.h"
 
 // On-device log-mel spectrogram front end. Must reproduce, bit-for-bit-close,
