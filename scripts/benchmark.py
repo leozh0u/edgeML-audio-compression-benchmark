@@ -121,7 +121,7 @@ def normalize(rows):
         elif stage == "tflite_int8":
             out.append({"label": f"{r['name']}-tflite", "name": r["name"], "stage": "tflite_int8",
                         "acc": r["int8_acc"], "size_kb": r["int8_kb"],
-                        "latency_ms": None})
+                        "latency_ms": r.get("int8_latency_ms")})
         elif stage == "prune":
             out.append({"label": f"{r['name']}-prune{int(r['target_sparsity']*100)}",
                         "name": r["name"], "stage": "prune",

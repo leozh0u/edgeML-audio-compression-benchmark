@@ -6,7 +6,8 @@
     "int8_kb": 74.5,
     "parity_max_abs": 8.58306884765625e-06,
     "parity_agreement": 1.0,
-    "path": "tflite_models/mid_student_int8_clean.tflite"
+    "path": "tflite_models/mid_student_int8_clean.tflite",
+    "int8_latency_ms": 0.346
   },
   {
     "name": "tiny_student",
@@ -15,6 +16,7 @@
     "int8_kb": 26.7,
     "parity_max_abs": 6.67572021484375e-06,
     "parity_agreement": 1.0,
-    "path": "tflite_models/tiny_student_int8_clean.tflite"
+    "path": "tflite_models/tiny_student_int8_clean.tflite",
+    "int8_latency_ms": 0.241
   }
 ]

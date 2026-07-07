@@ -6,7 +6,7 @@
     "params": 992242,
     "acc": 0.775,
     "size_kb": 3893.8,
-    "latency_ms": 1.197
+    "latency_ms": 2.182
   },
   {
     "label": "mid_student-fp32",
@@ -14,8 +14,8 @@
     "stage": "fp32",
     "params": 63826,
     "acc": 0.705,
-    "size_kb": 260.5,
-    "latency_ms": 0.555
+    "size_kb": 260.6,
+    "latency_ms": 1.306
   },
   {
     "label": "tiny_student-fp32",
@@ -24,7 +24,7 @@
     "params": 16962,
     "acc": 0.565,
     "size_kb": 76.6,
-    "latency_ms": 0.402
+    "latency_ms": 1.003
   },
   {
     "label": "mid_student-ptq",
@@ -128,7 +128,7 @@
     "stage": "tflite_int8",
     "acc": 0.7,
     "size_kb": 74.5,
-    "latency_ms": null
+    "latency_ms": 0.346
   },
   {
     "label": "tiny_student-tflite",
@@ -136,6 +136,6 @@
     "stage": "tflite_int8",
     "acc": 0.54,
     "size_kb": 26.7,
-    "latency_ms": null
+    "latency_ms": 0.241
   }
 ]
