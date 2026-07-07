@@ -4,7 +4,7 @@ Shared building blocks for the edge-ML ESC-50 pipeline.
 Everything reusable lives here so the training / distillation / QAT / pruning /
 benchmark scripts agree on ONE definition of paths, feature extraction, the
 dataset, and the model architectures. The architectures below must stay byte-for-byte
-compatible with the committed checkpoints (see DECISIONS.md section 3).
+compatible with the saved checkpoints (exact layer specs in DECISIONS.md).
 
 Path resolution is location-independent: it derives everything from this file's
 location, so it works whether the repo is at ~/edge-ml-esc50 (old handoff layout)

@@ -32,7 +32,7 @@ embedding, quantization I/O, config, dashboard bridge, and the mel front end
 
 ## Generate the model array
 The TFLite export hang (DECISIONS.md M4) is resolved — see DECISIONS.md
-§0 and DECISIONS.md "Milestone 4 RESOLVED". Use the clean int8 tflite:
+"Milestone 4 RESOLVED". Use the clean int8 tflite:
 ```bash
 ../esc50env/bin/python3 ../scripts/export_esp32.py --tflite ../tflite_models/mid_student_int8_clean.tflite
 ```

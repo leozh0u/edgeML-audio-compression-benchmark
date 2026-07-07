@@ -5,7 +5,7 @@ WITHOUT needing the ESP32 board: compiles esp32/host_test/harness.cc as a
 native binary, runs it on synthetic PCM, and diffs the output against librosa.
 
 This is the off-board half of the "must be A/B-validated" requirement in
-DECISIONS.md / DECISIONS.md. It proves the DSP math (framing, Hann
+DECISIONS.md. It proves the DSP math (framing, Hann
 window, FFT, mel filterbank, power_to_db, z-norm) is correct. It does NOT
 replace the on-device check with a real microphone clip once the board is in
 hand -- ADC noise, I2S timing, and fixed-point/latency effects only show up

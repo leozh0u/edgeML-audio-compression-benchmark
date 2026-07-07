@@ -7,7 +7,7 @@
 // STATUS: structurally complete and flash-ready. mel_frontend.cc now does the
 // real FFT/mel math (off-board validated against librosa, see
 // scripts/validate_mel_frontend.py) instead of the old zero-fill stub, and
-// the milestone-4 TFLite export hang is resolved (see DECISIONS.md §0),
+// the milestone-4 TFLite export hang is resolved (see DECISIONS.md),
 // so a trustworthy int8 .tflite exists to embed via export_esp32.py.
 // int8 quant params (input scale/zero-point) are read from the .tflite at
 // runtime via input->params (below), never hardcoded.
