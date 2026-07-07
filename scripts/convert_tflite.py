@@ -13,11 +13,11 @@ import torch
 import torch.nn as nn
 import tensorflow as tf
 
-ESC50_ROOT = os.path.expanduser("~/ESC-50")
+ESC50_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "ESC-50")
 AUDIO_DIR = os.path.join(ESC50_ROOT, "audio")
 META_CSV = os.path.join(ESC50_ROOT, "meta/esc50.csv")
-CKPT_DIR = os.path.expanduser("~/edge-ml-esc50/checkpoints")
-TFLITE_DIR = os.path.expanduser("~/edge-ml-esc50/tflite_models")
+CKPT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "checkpoints")
+TFLITE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tflite_models")
 SR = 22050
 N_MELS = 64
 DURATION = 5

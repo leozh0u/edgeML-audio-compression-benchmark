@@ -1,0 +1,125 @@
+[
+  {
+    "label": "teacher-fp32",
+    "name": "teacher",
+    "stage": "fp32",
+    "params": 992242,
+    "acc": 0.775,
+    "size_kb": 3893.8,
+    "latency_ms": 1.143
+  },
+  {
+    "label": "mid_student-fp32",
+    "name": "mid_student",
+    "stage": "fp32",
+    "params": 63826,
+    "acc": 0.705,
+    "size_kb": 260.5,
+    "latency_ms": 0.547
+  },
+  {
+    "label": "tiny_student-fp32",
+    "name": "tiny_student",
+    "stage": "fp32",
+    "params": 16962,
+    "acc": 0.565,
+    "size_kb": 76.6,
+    "latency_ms": 0.372
+  },
+  {
+    "label": "mid_student-ptq",
+    "name": "mid_student",
+    "stage": "ptq",
+    "acc": 0.71,
+    "size_kb": 71.0,
+    "latency_ms": 0.178
+  },
+  {
+    "label": "tiny_student-ptq",
+    "name": "tiny_student",
+    "stage": "ptq",
+    "acc": 0.5275,
+    "size_kb": 37.6,
+    "latency_ms": 0.146
+  },
+  {
+    "label": "mid_student-qat",
+    "name": "mid_student",
+    "stage": "qat",
+    "acc": 0.7075,
+    "size_kb": 70.9,
+    "latency_ms": null
+  },
+  {
+    "label": "tiny_student-qat",
+    "name": "tiny_student",
+    "stage": "qat",
+    "acc": 0.565,
+    "size_kb": 25.0,
+    "latency_ms": null
+  },
+  {
+    "label": "mid_student-prune30",
+    "name": "mid_student",
+    "stage": "prune",
+    "acc": 0.7025,
+    "size_kb": 183.2,
+    "latency_ms": null
+  },
+  {
+    "label": "mid_student-prune50",
+    "name": "mid_student",
+    "stage": "prune",
+    "acc": 0.7075,
+    "size_kb": 140.0,
+    "latency_ms": null
+  },
+  {
+    "label": "mid_student-prune70",
+    "name": "mid_student",
+    "stage": "prune",
+    "acc": 0.7,
+    "size_kb": 95.5,
+    "latency_ms": null
+  },
+  {
+    "label": "mid_student-prune90",
+    "name": "mid_student",
+    "stage": "prune",
+    "acc": 0.5525,
+    "size_kb": 46.6,
+    "latency_ms": null
+  },
+  {
+    "label": "tiny_student-prune30",
+    "name": "tiny_student",
+    "stage": "prune",
+    "acc": 0.57,
+    "size_kb": 51.3,
+    "latency_ms": null
+  },
+  {
+    "label": "tiny_student-prune50",
+    "name": "tiny_student",
+    "stage": "prune",
+    "acc": 0.5675,
+    "size_kb": 40.3,
+    "latency_ms": null
+  },
+  {
+    "label": "tiny_student-prune70",
+    "name": "tiny_student",
+    "stage": "prune",
+    "acc": 0.535,
+    "size_kb": 28.4,
+    "latency_ms": null
+  },
+  {
+    "label": "tiny_student-prune90",
+    "name": "tiny_student",
+    "stage": "prune",
+    "acc": 0.25,
+    "size_kb": 15.0,
+    "latency_ms": null
+  }
+]

@@ -4,3 +4,9 @@ checkpoints/
 ESC-50/
 __pycache__/
 *.pyc
+feature_cache.npz
+tflite_models/
+.DS_Store
+esp32/.pio/
+esp32/src/esc50_model/model_data.cc
+# results/ is kept in git: benchmark.json + pareto.png are the deliverable.

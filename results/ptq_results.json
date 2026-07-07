@@ -1,0 +1,22 @@
+[
+  {
+    "name": "mid_student",
+    "stage": "ptq",
+    "fp32_acc": 0.705,
+    "fp32_kb": 250.5,
+    "fp32_latency_ms": 0.429,
+    "int8_acc": 0.71,
+    "int8_kb": 71.0,
+    "int8_latency_ms": 0.178
+  },
+  {
+    "name": "tiny_student",
+    "stage": "ptq",
+    "fp32_acc": 0.565,
+    "fp32_kb": 19.3,
+    "fp32_latency_ms": 0.296,
+    "int8_acc": 0.5275,
+    "int8_kb": 37.6,
+    "int8_latency_ms": 0.146
+  }
+]

@@ -1,0 +1,66 @@
+[
+  {
+    "name": "mid_student",
+    "stage": "prune",
+    "target_sparsity": 0.3,
+    "actual_sparsity": 0.3,
+    "acc": 0.7025,
+    "compressed_kb": 183.2
+  },
+  {
+    "name": "mid_student",
+    "stage": "prune",
+    "target_sparsity": 0.5,
+    "actual_sparsity": 0.5,
+    "acc": 0.7075,
+    "compressed_kb": 140.0
+  },
+  {
+    "name": "mid_student",
+    "stage": "prune",
+    "target_sparsity": 0.7,
+    "actual_sparsity": 0.7,
+    "acc": 0.7,
+    "compressed_kb": 95.5
+  },
+  {
+    "name": "mid_student",
+    "stage": "prune",
+    "target_sparsity": 0.9,
+    "actual_sparsity": 0.9,
+    "acc": 0.5525,
+    "compressed_kb": 46.6
+  },
+  {
+    "name": "tiny_student",
+    "stage": "prune",
+    "target_sparsity": 0.3,
+    "actual_sparsity": 0.3,
+    "acc": 0.57,
+    "compressed_kb": 51.3
+  },
+  {
+    "name": "tiny_student",
+    "stage": "prune",
+    "target_sparsity": 0.5,
+    "actual_sparsity": 0.5,
+    "acc": 0.5675,
+    "compressed_kb": 40.3
+  },
+  {
+    "name": "tiny_student",
+    "stage": "prune",
+    "target_sparsity": 0.7,
+    "actual_sparsity": 0.7,
+    "acc": 0.535,
+    "compressed_kb": 28.4
+  },
+  {
+    "name": "tiny_student",
+    "stage": "prune",
+    "target_sparsity": 0.9,
+    "actual_sparsity": 0.9,
+    "acc": 0.25,
+    "compressed_kb": 15.0
+  }
+]

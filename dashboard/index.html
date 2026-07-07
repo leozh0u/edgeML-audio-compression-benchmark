@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>edgeML-audio · compression benchmark</title>
+<!-- Real React, no build step: UMD builds + React.createElement (aliased h). -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --ink:#e6edf3; --muted:#8b98a5; --line:#2d3440;
+          --fp32:#4c9aff; --ptq:#ff9f40; --qat:#4caf7d; --prune:#e05561; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  header { padding:20px 28px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:19px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .wrap { display:grid; grid-template-columns:1.4fr 1fr; gap:20px; padding:20px 28px; }
+  @media (max-width: 980px){ .wrap{ grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .panel h2 { margin:0 0 12px; font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:right; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; cursor:pointer; user-select:none; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .badge { font-size:11px; padding:1px 7px; border-radius:10px; color:#0f1419; font-weight:700; }
+  .live-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--line); }
+  .bar { height:8px; border-radius:4px; background:var(--qat); }
+  .status { font-size:12px; padding:3px 9px; border-radius:10px; }
+  .on { background:#153d2e; color:#4caf7d; } .off { background:#3d1519; color:#e05561; }
+  .legend { display:flex; gap:14px; margin-top:10px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+  .frontier { color:var(--muted); font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const h = React.createElement;
+const STAGE_COLORS = { fp32:"var(--fp32)", ptq:"var(--ptq)", qat:"var(--qat)", prune:"var(--prune)" };
+
+// --- Pareto scatter (accuracy vs size, log-x), frontier highlighted ---
+function ParetoChart({ rows }) {
+  const W=520, H=360, pad=48;
+  if (!rows.length) return h("p",{style:{color:"var(--muted)"}},"No benchmark.json yet. Run scripts/benchmark.py.");
+  const xs = rows.map(r=>Math.log10(r.size_kb));
+  const ys = rows.map(r=>r.acc*100);
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys)-3, y1=Math.max(...ys)+3;
+  const sx = v => pad + (Math.log10(v)-x0)/(x1-x0||1)*(W-2*pad);
+  const sy = v => H-pad - (v-y0)/(y1-y0||1)*(H-2*pad);
+
+  // Pareto frontier: minimize size, maximize acc.
+  const front = rows.filter(p => !rows.some(q =>
+     q!==p && q.size_kb<=p.size_kb && q.acc>=p.acc && (q.size_kb!==p.size_kb||q.acc!==p.acc)))
+     .sort((a,b)=>a.size_kb-b.size_kb);
+
+  const ticks = [10,25,50,100,250,500,1000,2000,4000].filter(t=>t>=Math.pow(10,x0)*0.8 && t<=Math.pow(10,x1)*1.2);
+  return h("svg",{viewBox:`0 0 ${W} ${H}`, style:{width:"100%",height:"auto"}},
+    ticks.map(t=>h("g",{key:t},
+      h("line",{x1:sx(t),y1:pad-10,x2:sx(t),y2:H-pad,stroke:"var(--line)"}),
+      h("text",{x:sx(t),y:H-pad+16,fill:"var(--muted)",fontSize:10,textAnchor:"middle"},t+"KB"))),
+    [0,25,50,75,100].filter(v=>v>=y0&&v<=y1).map(v=>h("g",{key:"y"+v},
+      h("line",{x1:pad,y1:sy(v),x2:W-pad,y2:sy(v),stroke:"var(--line)"}),
+      h("text",{x:pad-8,y:sy(v)+3,fill:"var(--muted)",fontSize:10,textAnchor:"end"},v+"%"))),
+    h("polyline",{points:front.map(p=>`${sx(p.size_kb)},${sy(p.acc*100)}`).join(" "),
+      fill:"none",stroke:"var(--muted)",strokeDasharray:"5 4",strokeWidth:1.5}),
+    rows.map((r,i)=>h("g",{key:i},
+      h("circle",{cx:sx(r.size_kb),cy:sy(r.acc*100),r:6,fill:STAGE_COLORS[r.stage],
+        stroke:"#0f1419",strokeWidth:1}),
+      h("title",null,`${r.label}\n${(r.acc*100).toFixed(1)}%  ${r.size_kb}KB`))),
+    h("text",{x:W/2,y:H-8,fill:"var(--muted)",fontSize:11,textAnchor:"middle"},"model size (KB, log)"),
+    h("text",{x:14,y:H/2,fill:"var(--muted)",fontSize:11,textAnchor:"middle",
+      transform:`rotate(-90 14 ${H/2})`},"val accuracy (%)")
+  );
+}
+
+function ModelTable({ rows }) {
+  const [sort,setSort] = React.useState("size_kb");
+  const sorted = [...rows].sort((a,b)=> (a[sort]>b[sort]?1:-1));
+  const col = (k,label)=>h("th",{onClick:()=>setSort(k)}, label);
+  return h("table",null,
+    h("thead",null,h("tr",null,
+      col("label","model"), col("stage","stage"), col("acc","acc%"),
+      col("size_kb","size KB"), col("latency_ms","lat ms"))),
+    h("tbody",null, sorted.map((r,i)=>h("tr",{key:i},
+      h("td",null, h("span",{className:"dot",style:{background:STAGE_COLORS[r.stage]}}), r.label),
+      h("td",null, h("span",{className:"badge",style:{background:STAGE_COLORS[r.stage]}}, r.stage)),
+      h("td",null,(r.acc*100).toFixed(1)),
+      h("td",null,r.size_kb.toFixed(1)),
+      h("td",null, r.latency_ms!=null? r.latency_ms.toFixed(2) : "—")
+    ))));
+}
+
+function LivePanel() {
+  const [status,setStatus]=React.useState("connecting");
+  const [preds,setPreds]=React.useState([]);
+  React.useEffect(()=>{
+    let ws, dead=false;
+    const connect=()=>{
+      ws=new WebSocket(`ws://${location.hostname}:8765`);
+      ws.onopen=()=>setStatus("live");
+      ws.onclose=()=>{ if(!dead){ setStatus("offline"); setTimeout(connect,2000);} };
+      ws.onmessage=e=>{ const m=JSON.parse(e.data);
+        if(m.type==="prediction") setPreds(p=>[m,...p].slice(0,8)); };
+    };
+    connect();
+    return ()=>{ dead=true; ws&&ws.close(); };
+  },[]);
+  return h("div",null,
+    h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+      h("span",{style:{color:"var(--muted)",fontSize:12}},"stream ws://:8765"),
+      h("span",{className:"status "+(status==="live"?"on":"off")},
+        status==="live"?"● live":"● "+status)),
+    preds.length===0 ? h("p",{style:{color:"var(--muted)"}},
+      "Waiting for predictions. Start backend with --simulate, or flash the ESP32.")
+      : preds.map((p,i)=>h("div",{className:"live-row",key:i},
+        h("div",{style:{width:130,fontWeight:i===0?700:400}}, p.label),
+        h("div",{style:{flex:1,background:"var(--line)",borderRadius:4}},
+          h("div",{className:"bar",style:{width:`${p.confidence*100}%`}})),
+        h("div",{style:{width:44,textAlign:"right"}},(p.confidence*100).toFixed(0)+"%"),
+        h("div",{style:{width:64,textAlign:"right",color:"var(--muted)"}},p.latency_ms+"ms")))
+  );
+}
+
+function App() {
+  const [rows,setRows]=React.useState([]);
+  React.useEffect(()=>{ fetch("/api/benchmark").then(r=>r.json()).then(setRows).catch(()=>{}); },[]);
+  const legend = Object.entries(STAGE_COLORS).map(([k,c])=>
+    h("span",{key:k}, h("span",{className:"dot",style:{background:c}}), k.toUpperCase()));
+  return h("div",null,
+    h("header",null,
+      h("h1",null,"edgeML-audio · compression benchmark"),
+      h("p",null,"ESC-50 environmental sound classifier → ESP32-S3. Distillation · PTQ · QAT · pruning, on one Pareto frontier.")),
+    h("div",{className:"wrap"},
+      h("div",{className:"panel"},
+        h("h2",null,"Accuracy vs size — Pareto frontier"),
+        h(ParetoChart,{rows}),
+        h("div",{className:"legend"}, legend),
+        h("div",{className:"frontier"},"Dashed line = Pareto-optimal set (no other model is both smaller and more accurate).")),
+      h("div",null,
+        h("div",{className:"panel",style:{marginBottom:20}},
+          h("h2",null,"Live inference"), h(LivePanel)),
+        h("div",{className:"panel"},
+          h("h2",null,"All variants"), h(ModelTable,{rows})))));
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>

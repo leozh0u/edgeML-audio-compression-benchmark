@@ -1,0 +1,22 @@
+[
+  {
+    "name": "mid_student",
+    "stage": "qat",
+    "fp32_acc": 0.705,
+    "fp32_kb": 260.6,
+    "int8_acc": 0.7075,
+    "int8_kb": 70.9,
+    "acc_delta": 0.0025,
+    "size_reduction": 3.68
+  },
+  {
+    "name": "tiny_student",
+    "stage": "qat",
+    "fp32_acc": 0.565,
+    "fp32_kb": 76.7,
+    "int8_acc": 0.565,
+    "int8_kb": 25.0,
+    "acc_delta": 0.0,
+    "size_reduction": 3.06
+  }
+]

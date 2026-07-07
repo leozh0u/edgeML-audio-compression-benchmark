@@ -5,16 +5,20 @@ Runs in tflite_env (has onnx already) or esc50env (has onnxruntime already) - ei
 """
 
 import os
+import json
+import time
 import numpy as np
 import pandas as pd
 import librosa
 import onnxruntime as ort
 from onnxruntime.quantization import quantize_static, QuantType, QuantFormat, CalibrationDataReader
 
-ESC50_ROOT = os.path.expanduser("~/ESC-50")
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ESC50_ROOT = os.path.join(os.path.dirname(_REPO_ROOT), "ESC-50")
 AUDIO_DIR = os.path.join(ESC50_ROOT, "audio")
 META_CSV = os.path.join(ESC50_ROOT, "meta/esc50.csv")
-TFLITE_DIR = os.path.expanduser("~/edge-ml-esc50/tflite_models")
+TFLITE_DIR = os.path.join(_REPO_ROOT, "tflite_models")
+RESULTS_DIR = os.path.join(_REPO_ROOT, "results")
 SR = 22050
 N_MELS = 64
 DURATION = 5
@@ -62,6 +66,18 @@ def eval_onnx(session, val_df):
     return correct / total
 
 
+def latency_onnx(session, runs=50):
+    """Mean single-sample inference latency (ms) via ONNX Runtime on CPU."""
+    input_name = session.get_inputs()[0].name
+    x = np.random.randn(1, 1, N_MELS, 216).astype(np.float32)
+    for _ in range(5):
+        session.run(None, {input_name: x})
+    t0 = time.perf_counter()
+    for _ in range(runs):
+        session.run(None, {input_name: x})
+    return (time.perf_counter() - t0) / runs * 1000
+
+
 def quantize_and_eval(onnx_path, name, calib_files, val_df):
     fp32_size = os.path.getsize(onnx_path) / 1024
     fp32_session = ort.InferenceSession(onnx_path)
@@ -82,14 +98,19 @@ def quantize_and_eval(onnx_path, name, calib_files, val_df):
     int8_size = os.path.getsize(int8_path) / 1024
     int8_session = ort.InferenceSession(int8_path)
     int8_acc = eval_onnx(int8_session, val_df)
+    int8_latency = latency_onnx(int8_session)
+    fp32_latency = latency_onnx(fp32_session)
 
     print(f"\n--- {name} ---")
-    print(f"FP32: {fp32_acc:.3f} acc, {fp32_size:.1f} KB")
-    print(f"INT8: {int8_acc:.3f} acc, {int8_size:.1f} KB")
+    print(f"FP32: {fp32_acc:.3f} acc, {fp32_size:.1f} KB, {fp32_latency:.2f} ms")
+    print(f"INT8: {int8_acc:.3f} acc, {int8_size:.1f} KB, {int8_latency:.2f} ms")
     print(f"size reduction: {fp32_size / int8_size:.2f}x")
     print(f"accuracy delta: {int8_acc - fp32_acc:+.3f}")
-    return {"name": name, "fp32_acc": fp32_acc, "fp32_kb": fp32_size,
-            "int8_acc": int8_acc, "int8_kb": int8_size}
+    return {"name": name, "stage": "ptq",
+            "fp32_acc": round(fp32_acc, 4), "fp32_kb": round(fp32_size, 1),
+            "fp32_latency_ms": round(fp32_latency, 3),
+            "int8_acc": round(int8_acc, 4), "int8_kb": round(int8_size, 1),
+            "int8_latency_ms": round(int8_latency, 3)}
 
 
 def main():
@@ -109,6 +130,12 @@ def main():
     print("\n=== Summary ===")
     for r in results:
         print(r)
+
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    out = os.path.join(RESULTS_DIR, "ptq_results.json")
+    with open(out, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\nwrote {out}")
 
 
 if __name__ == "__main__":
