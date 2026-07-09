@@ -12,7 +12,9 @@ The ESP32 bridge hooks in at broadcast(): whatever feeds real predictions (a
 serial reader, an MQTT subscriber, or an HTTP ingest endpoint) just calls
 broadcast(prediction_dict). Nothing else changes.
 
-Run:  python dashboard/server.py --simulate
+Run (pick one feed):
+  python dashboard/server.py --simulate                      # synthetic demo
+  python dashboard/server.py --serial /dev/cu.usbserial-XXXX # live board over USB
 Then open http://localhost:8000
 """
 
@@ -91,6 +93,38 @@ def broadcast(prediction: dict):
         asyncio.run_coroutine_threadsafe(ws.send(msg), _loop)
 
 
+def start_serial_bridge(port, baud):
+    """Read the ESP32's `RESULT {json}` lines off the USB serial port and push each
+    to the dashboard via broadcast(). This is the real (non-simulated) device feed
+    over the flashing cable — no WiFi needed. Firmware emits these in SELFTEST and
+    MIC modes (see esp32/src/main.cpp::emit_result)."""
+    try:
+        import serial  # pyserial
+    except ImportError:
+        raise SystemExit("--serial needs pyserial:  pip install pyserial")
+
+    def reader():
+        while True:
+            try:
+                with serial.Serial(port, baud, timeout=1) as ser:
+                    print(f"serial: reading {port} @ {baud}")
+                    for raw in ser:
+                        line = raw.decode("utf-8", "replace").strip()
+                        if not line.startswith("RESULT "):
+                            continue
+                        try:
+                            pred = json.loads(line[len("RESULT "):])
+                        except json.JSONDecodeError:
+                            continue
+                        broadcast(pred)
+            except Exception as e:  # port unplugged / reset — retry
+                print(f"serial: {e}; retrying in 2s")
+                import time
+                time.sleep(2)
+
+    threading.Thread(target=reader, daemon=True).start()
+
+
 async def simulator():
     """Stand-in for the ESP32 feed: emit a plausible prediction every ~1.5s."""
     while True:
@@ -114,6 +148,9 @@ async def main_async(args):
     if args.simulate:
         print("mode  : SIMULATE (synthetic predictions; swap for ESP32 feed later)")
         asyncio.create_task(simulator())
+    elif args.serial:
+        print(f"mode  : SERIAL (live ESP32 feed from {args.serial})")
+        start_serial_bridge(args.serial, args.baud)
     else:
         print("mode  : LIVE (waiting for ESP32 to call broadcast())")
     async with websockets.serve(ws_handler, "", args.ws_port):
@@ -126,6 +163,10 @@ if __name__ == "__main__":
     ap.add_argument("--ws-port", type=int, default=8765)
     ap.add_argument("--simulate", action="store_true",
                     help="emit synthetic predictions until the ESP32 is flashed")
+    ap.add_argument("--serial", metavar="PORT",
+                    help="read live predictions from the ESP32 over USB serial, "
+                         "e.g. /dev/cu.usbserial-A5069RR4")
+    ap.add_argument("--baud", type=int, default=115200)
     args = ap.parse_args()
     try:
         asyncio.run(main_async(args))
