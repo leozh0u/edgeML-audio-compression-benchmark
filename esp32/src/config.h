@@ -14,10 +14,12 @@
 #define HOP_LENGTH       512
 #define N_CLASSES        50
 
-// TFLite Micro tensor arena. 200KB fits the tiny model in fast internal SRAM
-// (measured arena_used ~140KB) with headroom for WiFi/mic buffers. The mid model
-// needs ~273KB and only fits PSRAM (slow) — see DECISIONS.md M9 tradeoff.
-#define TENSOR_ARENA_KB  200
+// TFLite Micro tensor arena. Deployed model is mid int8 (70%): measured arena_used
+// ~273KB, which exceeds internal SRAM so it lands in PSRAM — fine now that esp-nn
+// SIMD kernels bring inference to ~416ms (was 22.5s with reference kernels; see
+// DECISIONS.md M9). 320KB gives headroom. For the low-latency tiny model (143ms,
+// 54%) drop this to 200 and regen model_data.cc from the tiny tflite.
+#define TENSOR_ARENA_KB  320
 
 // I2S wiring for an INMP441 MEMS mic (optional live-inference input).
 #define I2S_WS_PIN       15

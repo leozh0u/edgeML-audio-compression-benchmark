@@ -27,10 +27,14 @@
 
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
-#include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/system_setup.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "esc50_model/model_data.h"
+// The old tanakamasayuki lib uses the pre-ErrorReporter-removal TFLite Micro API;
+// the esp-nn build (ESP_TF / esp-tflite-micro) uses the modern one that dropped it.
+#ifndef ESP_NN
+#include "tensorflow/lite/micro/micro_error_reporter.h"
+#endif
 
 #ifndef BRINGUP_MODE
 #define BRINGUP_MODE 2          // default: on-device self-test on embedded real clips
@@ -205,10 +209,15 @@ void setup() {
                 arena_in_psram ? "PSRAM" : "internal SRAM");
 
   // tanakamasayuki/TensorFlowLite_ESP32 tracks an older TFLite Micro API whose
-  // MicroInterpreter still takes an ErrorReporter* (the modern build drops it).
+  // MicroInterpreter still takes an ErrorReporter* (the modern esp-nn build drops it).
+#ifdef ESP_NN
+  static tflite::MicroInterpreter static_interpreter(
+      model, resolver, tensor_arena, kArenaSize);
+#else
   static tflite::MicroErrorReporter micro_error_reporter;
   static tflite::MicroInterpreter static_interpreter(
       model, resolver, tensor_arena, kArenaSize, &micro_error_reporter);
+#endif
   interpreter = &static_interpreter;
   if (interpreter->AllocateTensors() != kTfLiteOk) {
     Serial.println("AllocateTensors failed — raise TENSOR_ARENA_KB");
