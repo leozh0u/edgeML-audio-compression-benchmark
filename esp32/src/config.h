@@ -14,8 +14,9 @@
 #define HOP_LENGTH       512
 #define N_CLASSES        50
 
-// TFLite Micro tensor arena. Mid student needs well under this; tune down after
-// the first run prints the actual used size.
+// TFLite Micro tensor arena. 200KB fits the tiny model in fast internal SRAM
+// (measured arena_used ~140KB) with headroom for WiFi/mic buffers. The mid model
+// needs ~273KB and only fits PSRAM (slow) — see DECISIONS.md M9 tradeoff.
 #define TENSOR_ARENA_KB  200
 
 // I2S wiring for an INMP441 MEMS mic (optional live-inference input).

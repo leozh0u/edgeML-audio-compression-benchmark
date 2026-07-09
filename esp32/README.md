@@ -47,19 +47,37 @@ librosa. Passing this proves the DSP math is right; it does NOT prove the
 real I2S/ADC mic capture is right — that still needs the board. Re-run after
 any change to `mel_frontend.cc` or the filterbank.
 
-## Build / flash (once the board is here)
+## Build / flash
+PlatformIO lives in `../../pioenv` (py3.11). Flash over the DevKitC **UART** port
+(`/dev/cu.usbserial-*`), not the native-USB port — `Serial` is on UART0.
 ```bash
-pio run                 # build
-pio run -t upload       # flash
+export PATH="$PWD/../../pioenv/bin:$PATH"
+pio run                                              # build (default: self-test mode)
+pio run -t upload --upload-port /dev/cu.usbserial-XXXX
 pio device monitor -b 115200
 ```
 
-## What genuinely still needs the board
-1. **On-device A/B check with a real mic clip**, not just synthetic PCM —
-   ADC noise, I2S timing/clock drift, and any fixed-point rounding on real
-   hardware aren't exercised by the host harness.
-2. **Real latency / RAM / flash measurements** and wiring the I2S mic capture
-   into `mel_frontend_compute()` + the WiFi bridge to
-   `dashboard/server.py::broadcast()`.
+## Build modes (`-DBRINGUP_MODE`)
+- `2` **self-test** (default): runs the full mel→inference pipeline on real ESC-50
+  clips embedded in `test_clips.h`. Proves the on-device DSP on real audio without
+  the mic. Prints PASS/FAIL + latency and a machine-readable `RESULT {json}` line.
+- `1` **model-check**: inference on a zero input — just proves the graph loads and
+  gives arena/latency.
+- `0` **mic**: live I2S capture → classify → dashboard. Written, but needs the mic
+  physically wired and the `>>14` gain shift calibrated on-board.
 
-Everything else is wired and just needs the board plugged in.
+## Measured on-device (ESP32-S3 N16R8) — see DECISIONS.md M9
+- Tiny INT8 (deployed): arena 137 KB (internal SRAM), inference 6.1 s, `dog` +
+  `church_bells` classify correctly on real audio (2/2).
+- Mid INT8: arena 273 KB — only fits PSRAM, 22.5 s. Tiny is the deployable model.
+- Latency is reference-kernel bound; esp-nn (`esp-tflite-micro`) is the next step.
+
+## What genuinely still needs the board
+1. **Wire the INMP441 I2S mic** into `mel_frontend_compute()` (mode 0). Real ADC
+   noise / I2S timing / gain staging are the only things the host harness and the
+   embedded-clip self-test can't exercise. Compare a captured clip's on-device mel
+   to `common.wav_to_mel` of the same source before trusting live predictions.
+2. **esp-nn kernel swap** for real-time latency (optional, big win).
+
+Model loading, int8 I/O, the mel front end on real audio, RAM/latency, and the
+dashboard bridge are all verified on hardware.
