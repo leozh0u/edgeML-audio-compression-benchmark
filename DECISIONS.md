@@ -133,3 +133,33 @@
 - Deliberately did NOT fabricate latency for `qat` (qnnpack int8 through the torch stack measures torch dispatch overhead more than model cost) or `prune` rows (unstructured zeros don't change dense compute time — reporting a "pruned latency" would imply a speedup that doesn't exist). Those stay null on purpose; that's the honest shape of unstructured pruning.
 - Latency proxy caveat within the caveat: fp32 rows are re-measured on every `benchmark.py` run, while ptq/tflite latencies come from their stage JSONs (measured in separate sessions, machine load varies). Cross-variant comparisons are order-of-magnitude, not benchmark-grade; the device numbers are the real ones.
 
+
+## Milestone 9: ESP32-S3 hardware bring-up — the estimates were wrong, and that's the finding
+Board in hand (ESP32-S3-DevKitC-1, N16R8: 16 MB flash, 8 MB PSRAM, 240 MHz, rev v0.2). This is the first time the firmware was ever *compiled and run*, and it surfaced two real bugs plus the deployment tradeoff the whole project was building toward. Every number below is measured on the actual chip.
+
+**Toolchain / bring-up friction (logged so it isn't re-suffered):**
+- PlatformIO installed into a dedicated `../pioenv` (py3.11); board flashes over the DevKitC's **UART** port (`/dev/cu.usbserial-*`, FTDI), not the native-USB port — `Serial` maps to UART0 by default, so the native-USB port shows nothing.
+- The framework download (~200 MB) stalled mid-transfer on the VPN and hung *pio* for 13 h on a dead socket. Fix: a watchdog wrapper that kills+retries `pio run` when `~/.platformio` stops growing for 120 s. Toolchain is cached now, so this is a one-time cost.
+
+**Two scaffold bugs the pre-board firmware hid (it had never been compiled):**
+1. `MicroInterpreter` was constructed with the modern 4-arg signature, but `tanakamasayuki/TensorFlowLite_ESP32` tracks an older TFLite Micro API that still requires an `ErrorReporter*`. Added a `MicroErrorReporter`. Lesson: an uncompiled "flash-ready" scaffold is a hypothesis, not a fact.
+2. The 200 KB tensor arena was a static `.bss` array → linker error, `dram0_0_seg overflowed`. The ESP32-S3 has only ~320 KB internal DRAM and ~103 KB is already `.bss` (framework/wifi/mel buffers). Moved the arena to a runtime `heap_caps_malloc`, preferring internal SRAM and falling back to PSRAM.
+
+**The deployment tradeoff, measured (this is the headline of the hardware phase):**
+- **Mid model (74.5 KB tflite, 70% acc):** `arena_used_bytes` = **273 KB**. That does not fit internal SRAM (only ~282 KB free, i.e. 97% utilization — no room for wifi/mic buffers), so it can only live in PSRAM. Inference from PSRAM: **22,563 ms (22.5 s)**. PSRAM bandwidth, not compute, dominates when every intermediate feature map is off-chip.
+- **Tiny model (26.7 KB tflite, 54% acc):** `arena_used_bytes` = **137 KB**, fits internal SRAM with ~84 KB heap to spare. Inference: **6,148 ms (6.1 s)** — 3.7× faster than mid-in-PSRAM purely from arena locality.
+- Both models run the **full on-device pipeline** (C mel front end → int8 inference) correctly on real embedded ESC-50 audio: `dog` and `church_bells` both classify correctly on-device (2/2), matching the host tflite prediction through the exact C DSP. **This closes the #1 risk item** — the mel front end is right not just on synthetic PCM but on real 16-bit audio through the on-chip float FFT. (Physical I2S mic capture is still unwired; that's the only remaining board item.)
+
+**Why 6.1 s and not the ~300 ms I estimated:** the estimate was simply wrong — it assumed optimized kernels. `tanakamasayuki/TensorFlowLite_ESP32` ships only **reference** int8 kernels (no SIMD); its `kernels/esp_nn/` directory is a README placeholder, not the real esp-nn implementation. The tiny model is ~240 M int8 MACs of conv; reference kernels at ~single-MAC-per-few-cycles put that in the multi-second range, and the identical per-clip latency (6148.2 ms every time, input-independent) confirms it's pure compute, not the mel front end. **The identified fix — not done, flagged as the next optimization — is Espressif's `esp-tflite-micro`, which bundles esp-nn (S3 SIMD kernels), expected 5–20× → sub-second.** That's a library swap with real integration risk, deliberately not attempted unsupervised over a flaky VPN.
+
+**Deployment decision:** ship the **tiny** model on-device (fits fast internal SRAM, runs, real-time-ish only after esp-nn). The mid model stays the headline *accuracy/size* result; the *on-device* story is tiny + the measured mid-doesn't-fit-RAM reason. This is exactly the accuracy/latency/**memory** trilemma the Pareto framing promised — now with silicon numbers, not host proxies.
+
+**Resume numbers corrected (these replace the ~300 ms / ~300 KB estimates everywhere):**
+- On-device model: **tiny INT8, 26.7 KB, 54%** (not mid — mid doesn't fit fast RAM).
+- On-device inference latency: **6.1 s** with reference kernels (→ sub-second projected with esp-nn).
+- On-device RAM: **137 KB tensor arena (internal SRAM) + ~103 KB static ≈ 240 KB** of 320 KB.
+- Flash: **816 KB** for the self-test build (of which ~431 KB is the 2 embedded demo clips; a mic-based production build is ~385 KB).
+
+**Firmware now has 3 build-time modes** (`-DBRINGUP_MODE`): `1` model-check (zero input), `2` self-test (embedded real clips → full pipeline, the default), `0` mic (live I2S capture, written but needs the mic wired + gain calibration). Each prediction also emits a machine-readable `RESULT {json}` line.
+
+**Live dashboard, now real (not simulated):** added `server.py --serial <port>`, a background thread that parses the board's `RESULT` lines off USB and calls `broadcast()`. Verified end-to-end: board → USB serial → WebSocket → client streamed 5 live device predictions. The "live WebSocket inference from the device" bullet is demonstrable on hardware over the flashing cable alone — no wifi needed.

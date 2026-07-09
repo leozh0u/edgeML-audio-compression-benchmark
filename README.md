@@ -125,13 +125,40 @@ python dashboard/server.py --simulate   # dashboard at localhost:8000
 # on-device front end: gen_mel_filterbank.py -> validate_mel_frontend.py
 ```
 
+## On-device (ESP32-S3, measured on silicon)
+
+The full pipeline — C mel front end → INT8 TFLite Micro inference — runs on an
+ESP32-S3 (N16R8) and classifies real ESC-50 audio correctly on-device (verified
+against the host tflite through the identical C DSP). Measured, not estimated:
+
+| Model | Arena (scratch RAM) | Fits internal SRAM? | Inference latency |
+|---|---|---|---|
+| Mid INT8 (74.5 KB, 70%) | 273 KB | ✗ → PSRAM only | 22.5 s |
+| **Tiny INT8 (26.7 KB, 54%)** | **137 KB** | **✓ (84 KB to spare)** | **6.1 s** |
+
+Two findings the board forced, both in [DECISIONS.md M9](DECISIONS.md):
+
+1. **The higher-accuracy mid model doesn't fit fast RAM.** Its 273 KB tensor
+   arena is 97% of the ESP32-S3's internal SRAM, so it only runs from PSRAM —
+   where inference is 22.5 s (memory-bandwidth bound). Tiny fits internal SRAM
+   and is 3.7× faster. This is the accuracy/latency/**memory** trilemma the
+   Pareto framing promised, now with silicon numbers. **Tiny is the deployed model.**
+2. **6.1 s, not the ~300 ms first estimated** — because the TFLite Micro library
+   used ships only reference (non-SIMD) int8 kernels; the ~240 M-MAC conv net is
+   compute-bound. The identified next optimization is Espressif's `esp-tflite-micro`
+   with esp-nn (S3 SIMD), projected 5–20× → sub-second.
+
+Live inference streams from the board to the React dashboard over USB serial
+(`server.py --serial`) — real device predictions, no simulation.
+
+**Remaining:** wiring the INMP441 I2S mic for live-capture input (the one step the
+host validation cannot cover — real ADC/timing/gain) and the esp-nn kernel swap.
+
 ## Status
 
-All software milestones are complete and validated. Hardware bring-up
-(flash, on-device mic A/B check, real latency/RAM measurements) is in
-progress — the firmware, INT8 model, and DSP front end are ready and
-host-validated, pending the board's arrival.
-
-The full engineering log — including why PTQ was measured two ways, the
-TensorFlow SavedModel hang that forced a Keras-rebuild conversion path, and
+All software milestones complete and validated; hardware bring-up done —
+flashed, full pipeline verified on real audio on-device, real latency/RAM/flash
+measured, live dashboard demonstrated over USB. The full engineering log —
+including why PTQ was measured two ways, the TensorFlow SavedModel hang that
+forced a Keras-rebuild conversion path, the on-device RAM/latency tradeoff, and
 every negative result — is in [DECISIONS.md](DECISIONS.md).
