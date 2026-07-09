@@ -129,30 +129,34 @@ python dashboard/server.py --simulate   # dashboard at localhost:8000
 
 The full pipeline — C mel front end → INT8 TFLite Micro inference — runs on an
 ESP32-S3 (N16R8) and classifies real ESC-50 audio correctly on-device (verified
-against the host tflite through the identical C DSP). Measured, not estimated:
+against the host tflite through the identical C DSP). All four rows measured on
+the same board:
 
-| Model | Arena (scratch RAM) | Fits internal SRAM? | Inference latency |
-|---|---|---|---|
-| Mid INT8 (74.5 KB, 70%) | 273 KB | ✗ → PSRAM only | 22.5 s |
-| **Tiny INT8 (26.7 KB, 54%)** | **137 KB** | **✓ (84 KB to spare)** | **6.1 s** |
+| Kernels | Model | Accuracy | Arena / location | Latency |
+|---|---|---|---|---|
+| reference | tiny | 54% | 137 KB / internal SRAM | 6.1 s |
+| reference | mid | 70% | 273 KB / PSRAM | 22.5 s |
+| esp-nn | tiny | 54% | 137 KB / internal SRAM | **143 ms** (43×) |
+| **esp-nn** | **mid (deployed)** | **70%** | 273 KB / PSRAM | **416 ms** (54×) |
 
-Two findings the board forced, both in [DECISIONS.md M9](DECISIONS.md):
+The story, in two moves ([DECISIONS.md M9–M10](DECISIONS.md)):
 
-1. **The higher-accuracy mid model doesn't fit fast RAM.** Its 273 KB tensor
-   arena is 97% of the ESP32-S3's internal SRAM, so it only runs from PSRAM —
-   where inference is 22.5 s (memory-bandwidth bound). Tiny fits internal SRAM
-   and is 3.7× faster. This is the accuracy/latency/**memory** trilemma the
-   Pareto framing promised, now with silicon numbers. **Tiny is the deployed model.**
-2. **6.1 s, not the ~300 ms first estimated** — because the TFLite Micro library
-   used ships only reference (non-SIMD) int8 kernels; the ~240 M-MAC conv net is
-   compute-bound. The identified next optimization is Espressif's `esp-tflite-micro`
-   with esp-nn (S3 SIMD), projected 5–20× → sub-second.
+1. **First bring-up said 6–22 s, not the ~300 ms I'd estimated** — because the
+   initial TFLite-Micro library shipped only reference (non-SIMD) kernels, and the
+   higher-accuracy mid model's 273 KB arena doesn't fit internal SRAM (→ PSRAM,
+   bandwidth-bound). That's the accuracy/latency/**memory** trilemma, on real silicon.
+2. **esp-nn dissolved it.** Swapping to Espressif's `esp-tflite-micro` + esp-nn
+   (ESP32-S3 SIMD assembly kernels) gave a **43–54×** speedup. The mid model — the
+   70% one that was "too slow / doesn't fit fast RAM" — now runs at **416 ms** from
+   PSRAM. So the deployed model is mid at full accuracy and real-time speed; tiny at
+   143 ms is the low-latency option. On an MCU, the kernel implementation matters as
+   much as the model.
 
 Live inference streams from the board to the React dashboard over USB serial
 (`server.py --serial`) — real device predictions, no simulation.
 
-**Remaining:** wiring the INMP441 I2S mic for live-capture input (the one step the
-host validation cannot cover — real ADC/timing/gain) and the esp-nn kernel swap.
+**Remaining:** wiring the INMP441 I2S mic for live-capture input — the one step the
+host validation can't cover (real ADC/timing/gain).
 
 ## Status
 

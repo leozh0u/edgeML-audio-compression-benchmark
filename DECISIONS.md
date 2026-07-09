@@ -163,3 +163,24 @@ Board in hand (ESP32-S3-DevKitC-1, N16R8: 16 MB flash, 8 MB PSRAM, 240 MHz, rev 
 **Firmware now has 3 build-time modes** (`-DBRINGUP_MODE`): `1` model-check (zero input), `2` self-test (embedded real clips → full pipeline, the default), `0` mic (live I2S capture, written but needs the mic wired + gain calibration). Each prediction also emits a machine-readable `RESULT {json}` line.
 
 **Live dashboard, now real (not simulated):** added `server.py --serial <port>`, a background thread that parses the board's `RESULT` lines off USB and calls `broadcast()`. Verified end-to-end: board → USB serial → WebSocket → client streamed 5 live device predictions. The "live WebSocket inference from the device" bullet is demonstrable on hardware over the flashing cable alone — no wifi needed.
+
+## Milestone 10: esp-nn optimized kernels — the fix that changed the deploy decision
+The M9 latency (tiny 6.1 s / mid 22.5 s) was reference-kernel bound. Swapped the unoptimized `tanakamasayuki/TensorFlowLite_ESP32` for Espressif's `esp-tflite-micro` + **esp-nn** via the `nickjgniklu/ESP_TF` Arduino/PlatformIO wrapper (enabled with `-DESP_NN -DCONFIG_NN_OPTIMIZED -DARCH_ESP32_S3`, which selects the ESP32-S3 SIMD **assembly** kernels). Kept it as a separate `esp32-s3-espnn` build env so the reference build stays flashable for the before/after comparison; `main.cpp` compiles against both APIs (the older lib needs a `MicroInterpreter` `ErrorReporter*`, the modern one dropped it — guarded on `-DESP_NN`).
+
+**Measured on the same board, same models, same clips (2/2 correct throughout):**
+
+| Kernels | Model | Accuracy | Arena / location | Latency |
+|---|---|---|---|---|
+| reference | tiny | 54% | 137 KB / internal SRAM | 6148 ms |
+| reference | mid | 70% | 273 KB / PSRAM | 22563 ms |
+| **esp-nn** | tiny | 54% | 137 KB / internal SRAM | **143 ms** (43×) |
+| **esp-nn** | **mid** | **70%** | 273 KB / PSRAM | **416 ms** (54×) |
+
+**The optimization dissolved the M9 tradeoff.** In M9 the mid model was effectively undeployable (22.5 s) and I fell back to tiny. With esp-nn the mid model runs at **416 ms even from PSRAM** — real-time for environmental sound — at its full 70% accuracy and higher confidence (dog 0.87, church_bells 0.95 vs tiny's 0.61/0.78). **So the deployment choice flipped back to the mid model**, and the resume line is now the strong one: 70% on-device at ~0.4 s. Tiny at 143 ms remains the low-latency option (one flag + arena change).
+
+**Corrected resume numbers (supersede M9's):**
+- On-device model: **mid INT8, 74.5 KB, 70%**, inference **~416 ms** (esp-nn, PSRAM arena).
+- Low-latency alternative: tiny INT8, 26.7 KB, 54%, **~143 ms** (esp-nn, internal SRAM).
+- The ~6 s / ~22 s numbers are the *reference-kernel* baseline — kept in the table because the 43–54× delta is the whole point: on an MCU, the kernel implementation matters as much as the model.
+
+**Why esp-nn is this much faster:** the S3 has 128-bit SIMD; esp-nn ships hand-written assembly for int8 conv/depthwise/pooling/fully-connected that the reference C kernels don't use. Espressif quotes ~42× on a person-detection model; I measured 43–54× on this conv net — consistent. `default_envs = esp32-s3-espnn` now, so `pio run` builds the fast path by default.
