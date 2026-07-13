@@ -152,17 +152,24 @@ The story, in two moves ([DECISIONS.md M9–M10](DECISIONS.md)):
    143 ms is the low-latency option. On an MCU, the kernel implementation matters as
    much as the model.
 
-Live inference streams from the board to the React dashboard over USB serial
-(`server.py --serial`) — real device predictions, no simulation.
-
-**Remaining:** wiring the INMP441 I2S mic for live-capture input — the one step the
-host validation can't cover (real ADC/timing/gain).
+**Live microphone input.** An INMP441 I2S MEMS mic drives the full on-device
+pipeline (I2S capture → C mel front end → esp-nn INT8 inference) at ~1.3 s/inference,
+and the predictions stream mic → USB serial → WebSocket → the React dashboard, live
+in the browser. Two on-board fixes got it there ([DECISIONS.md M11](DECISIONS.md)):
+the pre-board pin map used a GPIO that's a bonded flash line on the S3 (GPIO26–37 are
+flash/PSRAM), and the I2S gain was calibrated from a measured peak/RMS readout
+(`>>14` clipped loud transients; `>>15` gives headroom — and the mel front end's
+`power_to_db(ref=max)` + z-norm make it gain-invariant anyway, so the shift only has
+to avoid clipping). It responds sensibly to real sound — a clap reads as `fireworks`,
+a knock as `door_wood_knock`.
 
 ## Status
 
-All software milestones complete and validated; hardware bring-up done —
-flashed, full pipeline verified on real audio on-device, real latency/RAM/flash
-measured, live dashboard demonstrated over USB. The full engineering log —
-including why PTQ was measured two ways, the TensorFlow SavedModel hang that
-forced a Keras-rebuild conversion path, the on-device RAM/latency tradeoff, and
-every negative result — is in [DECISIONS.md](DECISIONS.md).
+**Complete, end to end on hardware.** Compression sweep → deployed on the ESP32-S3
+→ 70% model at 416 ms via esp-nn → live INMP441 microphone driving real-time
+inference into the dashboard. The full engineering log — why PTQ was measured two
+ways, the TensorFlow SavedModel hang that forced a Keras-rebuild conversion path,
+the on-device RAM/latency tradeoff, the 54× esp-nn kernel win that flipped the
+deploy decision, the I2S pin/gain calibration, and every negative result — is in
+[DECISIONS.md](DECISIONS.md). Optional future work: WiFi bridge (vs USB serial),
+structured pruning for dense speedups, mic-side AGC/denoise.
