@@ -159,7 +159,11 @@ static void i2s_mic_init() {
 }
 
 // Capture CLIP_SAMPLES into pcm_buf (int16). INMP441 packs its 24-bit sample in the
-// high bits of a 32-bit word; >>14 lands it in int16 range at a reasonable level.
+// high bits of a 32-bit word; the shift lands it in int16 range. >>15 (vs >>14)
+// was chosen after measuring on-board: at >>14 loud transients peaked ~31661,
+// clipping the int16 ceiling; >>15 gives ~16k peak headroom. The mel front end's
+// power_to_db(ref=max) + per-clip z-norm make it gain-invariant, so the shift only
+// has to avoid clipping while staying above the noise floor — both true at >>15.
 static void i2s_capture(int16_t* dst) {
   static int32_t raw[512];
   int filled = 0;
@@ -168,7 +172,7 @@ static void i2s_capture(int16_t* dst) {
     i2s_read(I2S_NUM_0, raw, sizeof(raw), &nbytes, portMAX_DELAY);
     int n = nbytes / sizeof(int32_t);
     for (int i = 0; i < n && filled < CLIP_SAMPLES; ++i)
-      dst[filled++] = (int16_t)(raw[i] >> 14);
+      dst[filled++] = (int16_t)(raw[i] >> 15);
   }
 }
 #endif
@@ -275,13 +279,23 @@ void loop() {
 
 #else  // MODE_MIC
   i2s_capture(pcm_buf);
+  // Gain diagnostic: peak/RMS of the captured int16 buffer. Target for a loud
+  // sound is a peak in the low thousands to ~20000 (of int16's 32767 max); a
+  // near-zero peak = gain too low / miswire, a pinned 32767 = saturating.
+  int32_t peak = 0; double sumsq = 0.0;
+  for (int i = 0; i < CLIP_SAMPLES; ++i) {
+    int32_t a = pcm_buf[i] < 0 ? -pcm_buf[i] : pcm_buf[i];
+    if (a > peak) peak = a;
+    sumsq += (double)pcm_buf[i] * pcm_buf[i];
+  }
+  int rms = (int)sqrt(sumsq / CLIP_SAMPLES);
   uint32_t t0 = micros();
   mel_frontend_compute(pcm_buf, mel_buf);
   float melf_ms = (micros() - t0) / 1000.0f;
   float conf, inf_ms;
   int cls = run_inference(mel_buf, &conf, &inf_ms);
-  Serial.printf("[mic] pred=%-14s conf=%.2f  mel=%.1fms infer=%.1fms total=%.1fms\n",
-                cls >= 0 ? CLASSES[cls] : "ERR", conf, melf_ms, inf_ms, melf_ms + inf_ms);
+  Serial.printf("[mic] pred=%-14s conf=%.2f  peak=%ld rms=%d  mel=%.1fms infer=%.1fms total=%.1fms\n",
+                cls >= 0 ? CLASSES[cls] : "ERR", conf, (long)peak, rms, melf_ms, inf_ms, melf_ms + inf_ms);
   emit_result(cls, conf, melf_ms + inf_ms, "mic");
   // wifi_bridge_push(CLASSES[cls], cls, conf, melf_ms + inf_ms);
 #endif

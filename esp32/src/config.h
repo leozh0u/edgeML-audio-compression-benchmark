@@ -22,9 +22,12 @@
 #define TENSOR_ARENA_KB  320
 
 // I2S wiring for an INMP441 MEMS mic (optional live-inference input).
-#define I2S_WS_PIN       15
-#define I2S_SCK_PIN      14
-#define I2S_SD_PIN       32
+// NOTE: pins must be free GPIOs on the ESP32-S3-WROOM-1 (N16R8). GPIO26-37 are
+// bonded to the in-package SPI flash + octal PSRAM and are NOT usable — the old
+// SD=32 (a classic-ESP32 I2S pin) is a flash data line on the S3. 4/5/6 are free.
+#define I2S_SCK_PIN      4     // BCLK (bit clock)
+#define I2S_WS_PIN       5     // LRCLK / word select
+#define I2S_SD_PIN       6     // data out from mic
 
 // Dashboard bridge (server.py runs the WebSocket on port 8765).
 #define WIFI_SSID        "YOUR_SSID"
