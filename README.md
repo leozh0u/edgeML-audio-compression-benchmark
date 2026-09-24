@@ -44,7 +44,7 @@ ESC-50 standard protocol: folds 1-4 train, fold 5 validation. Full sweep in
 | Teacher FP32 | 992,242 | 77.5% | 3.9 MB | 1× |
 | MidStudent FP32 (distilled) | 63,826 | 70.5% | 260.5 KB | 15× |
 | MidStudent INT8 QAT | 63,826 | **70.8%** | **70.9 KB** | **55×** |
-| MidStudent prune 70% + fine-tune | — | 70.0% | 95.5 KB | 41× |
+| MidStudent prune 70% + fine-tune | n/a | 70.0% | 95.5 KB | 41× |
 | TinyStudent FP32 (distilled) | 16,962 | 56.5% | 76.6 KB | 51× |
 | TinyStudent INT8 PTQ | 16,962 | 52.75% | 37.6 KB (grew) | *dominated* |
 | TinyStudent INT8 QAT | 16,962 | **56.5%** | **25.0 KB** | **156×** |
@@ -73,22 +73,22 @@ ESC-50 wav ──► log-mel (64×216) ──► CNN teacher (992K params, 77.5%
                     ESP32-S3 (TFLite Micro, INT8) ── WebSocket ───┘
 ```
 
-- **Distillation** — soft-target KD (temperature 4, α 0.7) from the teacher into
+- **Distillation**: soft-target KD (temperature 4, α 0.7) from the teacher into
   two student capacities, chosen to straddle the "too small to compress?" question.
-- **PTQ** — ONNX Runtime static quantization (QDQ, INT8 weights + activations),
+- **PTQ**: ONNX Runtime static quantization (QDQ, INT8 weights + activations),
   calibrated on training-fold features.
-- **QAT** — PyTorch FX-graph fake-quantization fine-tuned **with the same
+- **QAT**: PyTorch FX-graph fake-quantization fine-tuned **with the same
   distillation loss**, so the student optimizes for its quantized self under the
   teacher's guidance. Best-epoch selection happens on the fake-quant model;
   conversion to real INT8 happens exactly once.
-- **Pruning** — global unstructured L1 magnitude pruning with KD fine-tune at
+- **Pruning**: global unstructured L1 magnitude pruning with KD fine-tune at
   30/50/70/90% sparsity.
-- **Benchmark harness** — `scripts/benchmark.py` re-evaluates every variant and
+- **Benchmark harness**: `scripts/benchmark.py` re-evaluates every variant and
   emits `results/benchmark.json` + the Pareto plot.
-- **Dashboard** — zero-build React (no bundler) + stdlib-HTTP/WebSocket Python
+- **Dashboard**: zero-build React (no bundler) + stdlib-HTTP/WebSocket Python
   backend: Pareto scatter, full variant table, live inference stream.
   See [dashboard/README.md](dashboard/README.md).
-- **ESP32-S3 deployment** — TFLite Micro firmware with a from-scratch C
+- **ESP32-S3 deployment**: TFLite Micro firmware with a from-scratch C
   mel-spectrogram front end (framing, periodic Hann, radix-2 FFT, sparse mel
   filterbank, `power_to_db`), **A/B-validated off-board against the Python
   training pipeline to max|Δ| ≤ 0.0009, corr ≥ 0.99999**.
@@ -101,7 +101,7 @@ scripts/     training, distillation, QAT, pruning, quantization, export, benchma
 results/     benchmark.json + pareto.png (the deliverable numbers)
 dashboard/   React + WebSocket dashboard (zero-build) and Python server
 esp32/       PlatformIO firmware: TFLite Micro + C DSP front end + host test harness
-DECISIONS.md every decision, bug, dead end, and pivot — the engineering log
+DECISIONS.md every decision, bug, dead end, and pivot: the engineering log
 ```
 
 ## Reproduce
